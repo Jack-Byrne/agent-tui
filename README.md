@@ -313,4 +313,4 @@ npm run build                    # compile to dist/
 
 ## License
 
-See [package.json](package.json) for package metadata. Add a `LICENSE` file if you publish this repo publicly.
+[MIT](LICENSE). SPDX identifier `MIT` is also set in [`package.json`](package.json) (`license` field).

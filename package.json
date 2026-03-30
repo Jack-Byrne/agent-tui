@@ -2,6 +2,7 @@
   "name": "agent-tui",
   "version": "0.1.0",
   "description": "Terminal TUI scaffolder for AI agent design patterns",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "agent-tui": "./dist/cli.js"
