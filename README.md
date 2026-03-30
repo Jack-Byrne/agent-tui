@@ -35,9 +35,12 @@ node dist/cli.js create -o ./out
 
 ```bash
 agent-tui create [--output|-o <dir>]
+agent-tui create-from <path/to/agent.scaffold.json> [-o <dir>]
 ```
 
 - **`-o, --output <dir>`** — Parent directory for the generated folder (default: current directory). The project is written to `<dir>/<project-name>/` where `project-name` comes from the wizard.
+
+**Regenerate with the same options:** every generated project includes **`agent.scaffold.json`** (what the wizard chose). Run **`create-from`** with that file to re-run the template pipeline without the TUI—useful after upgrading `agent-tui` or editing templates. If the manifest still lives at `<output>/<projectName>/agent.scaffold.json`, you can omit `-o` (the parent directory is inferred). Example: `agent-tui create-from ./out/my-agent/agent.scaffold.json`. **Note:** this overwrites generated files in that folder; keep secrets (`.env`) elsewhere or back them up first.
 
 ### In the wizard
 
@@ -106,7 +109,7 @@ Sub-steps in order:
 | `azure_openai` | `AZURE_OPENAI_API_KEY` | Code also expects **`AZURE_RESOURCE_NAME`** for Azure OpenAI. |
 | `ollama` | `OLLAMA_BASE_URL` | Local OpenAI-compatible `/v1` path; no real API key. |
 
-Default model suggestions when you switch provider: `gpt-4o-mini`, `claude-3-5-sonnet-20241022`, `gemini-1.5-flash`, `gpt-4o` (Azure), `llama3.2` (Ollama).
+Default model suggestions when you switch provider: `gpt-4o-mini`, `claude-sonnet-4-6`, `gemini-1.5-flash`, `gpt-4o` (Azure), `llama3.2` (Ollama). If the API returns `not_found_error` for a model id, your key may only see newer models—check [Anthropic’s model overview](https://docs.anthropic.com/en/docs/about-claude/models/overview) or list models with `curl -s https://api.anthropic.com/v1/models -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01"`.
 
 ### 4. Memory
 

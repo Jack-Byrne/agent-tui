@@ -113,6 +113,8 @@ describe("generateProject", () => {
     const pkg = await fs.readJSON(join(proj, "package.json"));
     expect(pkg.dependencies["better-sqlite3"]).toBeDefined();
     expect(pkg.dependencies.pg).toBeUndefined();
+    expect(pkg.devDependencies["@types/better-sqlite3"]).toBeDefined();
+    expect(pkg.devDependencies["@types/pg"]).toBeUndefined();
     const stub = await fs.readFile(join(proj, "src/db/drizzle-stub.ts"), "utf8");
     expect(stub).toContain("better-sqlite3");
     expect(stub).toContain("data/app.db");

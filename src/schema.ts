@@ -130,7 +130,8 @@ export function defaultModelForProvider(provider: LlmProvider): string {
     case "openai":
       return "gpt-4o-mini";
     case "anthropic":
-      return "claude-3-5-sonnet-20241022";
+      // Stable API id (see https://docs.anthropic.com/en/docs/about-claude/models/overview )
+      return "claude-sonnet-4-6";
     case "google":
       return "gemini-1.5-flash";
     case "azure_openai":

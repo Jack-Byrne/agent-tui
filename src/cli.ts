@@ -76,4 +76,40 @@ program
     await waitUntilExit();
   });
 
+program
+  .command("create-from")
+  .description(
+    "Regenerate a project from agent.scaffold.json (same options as the last wizard run; no TTY)",
+  )
+  .argument("<manifest>", "Path to agent.scaffold.json")
+  .option(
+    "-o, --output <dir>",
+    "Parent directory for the project folder (default: inferred if manifest is at <dir>/<projectName>/agent.scaffold.json)",
+  )
+  .action(
+    async (
+      manifest: string,
+      opts: { output?: string },
+    ): Promise<void> => {
+      try {
+        const { loadScaffoldAnswersFromAgentFile } = await import(
+          "./generate/manifest.js"
+        );
+        const { generateProject } = await import("./generate/writer.js");
+        const { answers, outputDir } = await loadScaffoldAnswersFromAgentFile(
+          manifest,
+          { outputDir: opts.output },
+        );
+        await mkdir(outputDir, { recursive: true });
+        const result = await generateProject(outputDir, answers);
+        console.log("\nGenerated:", result.outputDir);
+        if (result.claudeSpawnNote) console.log("\nClaude:", result.claudeSpawnNote);
+        if (result.claudeSpawnStdout) console.log(result.claudeSpawnStdout);
+      } catch (err) {
+        console.error(err instanceof Error ? err.message : err);
+        process.exitCode = 1;
+      }
+    },
+  );
+
 program.parse();

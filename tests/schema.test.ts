@@ -64,5 +64,6 @@ describe("defaults", () => {
 
   it("suggests models", () => {
     expect(defaultModelForProvider("google")).toContain("gemini");
+    expect(defaultModelForProvider("anthropic")).toMatch(/^claude-/);
   });
 });
