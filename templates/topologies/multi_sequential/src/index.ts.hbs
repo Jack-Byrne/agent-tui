@@ -1,0 +1,11 @@
+import { runSequentialPipeline } from "./agents/sequential-pipeline.js";
+
+const input =
+  process.argv.slice(2).join(" ") || "Explain sequential multi-agent pipelines briefly.";
+
+runSequentialPipeline(input)
+  .then(console.log)
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });

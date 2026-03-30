@@ -1,0 +1,15 @@
+import { generateText } from "ai";
+import { createLanguageModel, llmDefaults } from "../../llm/create-model.js";
+import { systemPrompt } from "../../prompts/prompts.js";
+
+export async function calcWorker(task: string): Promise<string> {
+  const model = createLanguageModel();
+  const { text } = await generateText({
+    model,
+    temperature: llmDefaults.temperature,
+    maxTokens: Math.min(llmDefaults.maxTokens, 1024),
+    system: `${systemPrompt}\n\nYou are the CALC worker (stub) — reason about numbers carefully.`,
+    prompt: task,
+  });
+  return text;
+}

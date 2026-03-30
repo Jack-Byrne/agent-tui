@@ -1,0 +1,69 @@
+import { createOpenAI } from "@ai-sdk/openai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createAzure } from "@ai-sdk/azure";
+import type { LanguageModelV1 } from "ai";
+
+/**
+ * Model factory from scaffold answers — uses process.env per `agent.scaffold.json`.
+ */
+export function createLanguageModel(): LanguageModelV1 {
+  const provider = "{{llm.provider}}" as
+    | "openai"
+    | "anthropic"
+    | "google"
+    | "azure_openai"
+    | "ollama";
+  const modelId = "{{llm.model}}";
+
+  if (provider === "openai") {
+    const openai = createOpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      ...(process.env.LLM_BASE_URL
+        ? { baseURL: process.env.LLM_BASE_URL }
+        : {}),
+    });
+    return openai(modelId);
+  }
+
+  if (provider === "anthropic") {
+    const anthropic = createAnthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
+    return anthropic(modelId);
+  }
+
+  if (provider === "google") {
+    const google = createGoogleGenerativeAI({
+      apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+    });
+    return google(modelId);
+  }
+
+  if (provider === "azure_openai") {
+    const azure = createAzure({
+      apiKey: process.env.AZURE_OPENAI_API_KEY,
+      resourceName: process.env.AZURE_RESOURCE_NAME ?? "your-resource",
+    });
+    return azure(modelId);
+  }
+
+  if (provider === "ollama") {
+    const base = (process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434").replace(
+      /\/$/,
+      "",
+    );
+    const openai = createOpenAI({
+      apiKey: "ollama",
+      baseURL: `${base}/v1`,
+    });
+    return openai(modelId);
+  }
+
+  throw new Error(`Unsupported provider: ${provider}`);
+}
+
+export const llmDefaults = {
+  temperature: {{llm.temperature}},
+  maxTokens: {{llm.maxTokens}},
+} as const;

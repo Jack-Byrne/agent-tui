@@ -1,0 +1,31 @@
+import { generateText } from "ai";
+import { createLanguageModel, llmDefaults } from "../llm/create-model.js";
+import { getTools } from "../tools/registry.js";
+import { systemPrompt } from "../prompts/prompts.js";
+
+/**
+ * Human-in-the-loop: scaffold pauses for approval via env gate.
+ * Integrate your own UI / ticketing instead of SKIP_HITL in production.
+ * @see {{patternDocUrl}}
+ */
+export async function runHitlAgent(userInput: string): Promise<string> {
+  const model = createLanguageModel();
+  const tools = getTools();
+  const toolMap = Object.keys(tools).length ? tools : undefined;
+
+  const draft = await generateText({
+    model,
+    temperature: llmDefaults.temperature,
+    maxTokens: llmDefaults.maxTokens,
+    system: `${systemPrompt}\n\nProduce a draft; a human must approve before execution.`,
+    prompt: userInput,
+    tools: toolMap,
+    maxSteps: toolMap ? 4 : 1,
+  });
+
+  if (process.env.SKIP_HITL === "true") {
+    return draft.text;
+  }
+
+  return `${draft.text}\n\n[HitL checkpoint: require human approval before acting on tools in production]`;
+}

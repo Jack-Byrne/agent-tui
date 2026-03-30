@@ -1,0 +1,20 @@
+/**
+ * Memory backend stub — wire to your store (session, file, redis, sql).
+ * Scaffold setting: {{memory}}
+ */
+
+export interface MemorySession {
+  messages: { role: "user" | "assistant" | "system"; content: string }[];
+}
+
+export function createMemory(): MemorySession {
+  return { messages: [] };
+}
+
+export function appendUser(session: MemorySession, content: string) {
+  session.messages.push({ role: "user", content });
+}
+
+export function appendAssistant(session: MemorySession, content: string) {
+  session.messages.push({ role: "assistant", content });
+}

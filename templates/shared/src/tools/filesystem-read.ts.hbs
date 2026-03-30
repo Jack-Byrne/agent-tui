@@ -1,0 +1,14 @@
+import { tool } from "ai";
+import { z } from "zod";
+import fs from "node:fs/promises";
+
+export const filesystemReadTool = tool({
+  description: "Read a UTF-8 text file from disk (scaffold — restrict paths before production).",
+  parameters: z.object({
+    path: z.string().min(1),
+  }),
+  execute: async ({ path }) => {
+    const data = await fs.readFile(path, "utf8");
+    return { path, contentPreview: data.slice(0, 8000) };
+  },
+});

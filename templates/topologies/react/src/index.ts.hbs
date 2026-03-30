@@ -1,0 +1,14 @@
+import { runReactAgent } from "./agents/react-agent.js";
+
+const input =
+  process.argv.slice(2).join(" ") ||
+  "Use tools if helpful: what is agentic ReAct in one paragraph?";
+
+runReactAgent(input)
+  .then((text) => {
+    console.log(text);
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });

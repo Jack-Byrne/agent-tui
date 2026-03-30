@@ -1,0 +1,12 @@
+/**
+ * Prompt pack: {{prompts}}
+ * Reference: https://docs.cloud.google.com/architecture/choose-design-pattern-agentic-ai-system
+ */
+
+{{#if (eq prompts "minimal")}}
+export const systemPrompt =
+  "You are a capable assistant. Use tools when they help answer accurately.";
+{{else}}
+export const systemPrompt =
+  "You are a production agent. Prefer tools over hallucination; cite tool outputs; refuse unsafe requests; keep answers concise.";
+{{/if}}

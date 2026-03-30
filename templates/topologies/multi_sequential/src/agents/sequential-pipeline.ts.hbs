@@ -1,0 +1,50 @@
+import { generateText } from "ai";
+import { createLanguageModel, llmDefaults } from "../llm/create-model.js";
+import { systemPrompt } from "../prompts/prompts.js";
+
+/**
+ * Multi-agent sequential: fixed stages (extract → transform → respond).
+ * Replace each stage with a dedicated agent/module as you grow.
+ * @see {{patternDocUrl}}
+ */
+async function stageExtract(input: string): Promise<string> {
+  const model = createLanguageModel();
+  const { text } = await generateText({
+    model,
+    temperature: llmDefaults.temperature,
+    maxTokens: Math.min(llmDefaults.maxTokens, 1024),
+    system: `${systemPrompt}\n\nStage: extract structured facts only.`,
+    prompt: input,
+  });
+  return text;
+}
+
+async function stageTransform(extracted: string): Promise<string> {
+  const model = createLanguageModel();
+  const { text } = await generateText({
+    model,
+    temperature: llmDefaults.temperature,
+    maxTokens: Math.min(llmDefaults.maxTokens, 1024),
+    system: `${systemPrompt}\n\nStage: transform facts into a short plan.`,
+    prompt: extracted,
+  });
+  return text;
+}
+
+async function stageRespond(plan: string): Promise<string> {
+  const model = createLanguageModel();
+  const { text } = await generateText({
+    model,
+    temperature: llmDefaults.temperature,
+    maxTokens: llmDefaults.maxTokens,
+    system: `${systemPrompt}\n\nStage: final user-facing answer from the plan.`,
+    prompt: plan,
+  });
+  return text;
+}
+
+export async function runSequentialPipeline(userInput: string): Promise<string> {
+  const a = await stageExtract(userInput);
+  const b = await stageTransform(a);
+  return stageRespond(b);
+}

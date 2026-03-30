@@ -1,0 +1,16 @@
+/**
+ * Knowledge / RAG stub. Setting: {{knowledge}} (vector: {{vectorBackend}})
+ */
+
+export async function retrieveContext(_query: string): Promise<string> {
+  void _query;
+{{#if (eq knowledge "none")}}
+  return "";
+{{/if}}
+{{#if (eq knowledge "filesystem_rag_stub")}}
+  return "[filesystem RAG stub — index files under ./knowledge and embed]";
+{{/if}}
+{{#if (eq knowledge "vector_db")}}
+  return "[vector DB stub — implement pgvector or similar]";
+{{/if}}
+}

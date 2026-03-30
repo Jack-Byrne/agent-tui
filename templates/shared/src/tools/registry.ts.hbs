@@ -1,0 +1,36 @@
+import type { Tool } from "ai";
+import { z } from "zod";
+{{#if hasToolHttp}}
+import { httpFetchTool } from "./http.js";
+{{/if}}
+{{#if hasToolFilesystemRead}}
+import { filesystemReadTool } from "./filesystem-read.js";
+{{/if}}
+{{#if hasToolRunCommand}}
+import { runCommandTool } from "./run-command.js";
+{{/if}}
+{{#if hasToolCustomStub}}
+import { customStubTool } from "./custom-stub.js";
+{{/if}}
+
+/**
+ * Tool registry for AI SDK `generateText` / `streamText`.
+ */
+export function getTools(): Record<string, Tool> {
+  const tools: Record<string, Tool> = {};
+{{#if hasToolHttp}}
+  tools.http_fetch = httpFetchTool;
+{{/if}}
+{{#if hasToolFilesystemRead}}
+  tools.filesystem_read = filesystemReadTool;
+{{/if}}
+{{#if hasToolRunCommand}}
+  tools.run_command = runCommandTool;
+{{/if}}
+{{#if hasToolCustomStub}}
+  tools.custom_stub = customStubTool;
+{{/if}}
+  return tools;
+}
+
+export const emptyParams = z.object({});

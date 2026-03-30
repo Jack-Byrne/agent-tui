@@ -1,0 +1,15 @@
+import { generateText } from "ai";
+import { createLanguageModel, llmDefaults } from "../../llm/create-model.js";
+import { systemPrompt } from "../../prompts/prompts.js";
+
+export async function writeWorker(task: string): Promise<string> {
+  const model = createLanguageModel();
+  const { text } = await generateText({
+    model,
+    temperature: llmDefaults.temperature,
+    maxTokens: llmDefaults.maxTokens,
+    system: `${systemPrompt}\n\nYou are the WRITE worker (stub) — polish final wording.`,
+    prompt: task,
+  });
+  return text;
+}

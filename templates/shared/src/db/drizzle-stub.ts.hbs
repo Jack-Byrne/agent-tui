@@ -1,0 +1,30 @@
+{{#if useSqlDatabase}}
+{{#if (eq sqlBootstrap "sqlite_file")}}
+/**
+ * Drizzle + SQLite (better-sqlite3) — add schema and migrations for your workload.
+ */
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+
+const sqlitePath = process.env.SQLITE_PATH ?? "{{sqliteFilePath}}";
+mkdirSync(dirname(sqlitePath), { recursive: true });
+const sqlite = new Database(sqlitePath);
+export const db = drizzle(sqlite);
+{{else}}
+/**
+ * Drizzle + Postgres stub — add schema and migrations for your workload.
+ */
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
+
+const pool = new pg.Pool({
+  connectionString: process.env["{{databaseUrlEnvVar}}"],
+});
+
+export const db = drizzle(pool);
+{{/if}}
+{{else}}
+export {};
+{{/if}}

@@ -1,0 +1,34 @@
+import { generateText } from "ai";
+import { createLanguageModel, llmDefaults } from "../llm/create-model.js";
+import { systemPrompt } from "../prompts/prompts.js";
+import * as searchWorker from "./workers/search.js";
+import * as calcWorker from "./workers/calc.js";
+import * as writeWorker from "./workers/write.js";
+
+/**
+ * Coordinator / hierarchical decomposition stub.
+ * Replace `classify` with structured routing (LLM or rules).
+ * @see {{patternDocUrl}}
+ */
+async function classify(task: string): Promise<"search" | "calc" | "write"> {
+  const model = createLanguageModel();
+  const { text } = await generateText({
+    model,
+    temperature: 0,
+    maxTokens: 32,
+    system: `${systemPrompt}\n\nReturn exactly one token: search | calc | write`,
+    prompt: `Task: ${task}`,
+  });
+  const token = text.trim().toLowerCase();
+  if (token.includes("calc")) return "calc";
+  if (token.includes("write")) return "write";
+  return "search";
+}
+
+export async function runCoordinator(userInput: string): Promise<string> {
+  const route = await classify(userInput);
+  if (route === "calc") return calcWorker.calcWorker(userInput);
+  if (route === "write") return writeWorker.writeWorker(userInput);
+  const researched = await searchWorker.searchWorker(userInput);
+  return writeWorker.writeWorker(`Synthesize for user.\n${researched}`);
+}

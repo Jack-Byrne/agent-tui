@@ -1,0 +1,62 @@
+# {{projectName}}
+
+Scaffolded agent project aligned with **{{patternLabel}}**.
+
+- **Google Cloud agent patterns guide**: [choose-design-pattern-agentic-ai-system]({{{patternDocUrl}}})
+- **Chosen pattern id**: `{{patternId}}`
+- **Topology**: `{{topology}}`
+
+## Quick start
+
+```bash
+cp .env.example .env
+# fill in secrets
+npm install
+npm run build
+npm start
+```
+
+{{#if useSqlDatabase}}
+{{#if (eq sqlBootstrap "docker_postgres")}}
+## Local Postgres (Docker)
+
+If you do not already have a database, start the bundled Postgres:
+
+```bash
+docker compose up -d
+```
+
+Ensure `{{{databaseUrlEnvVar}}}` in `.env` matches [docker-compose.yml](docker-compose.yml) (default in `.env.example`: `postgres://postgres:postgres@localhost:5432/agent`).
+{{/if}}
+{{#if (eq sqlBootstrap "sqlite_file")}}
+## Local SQLite
+
+No database server required. The app opens `SQLITE_PATH` (default `{{{sqliteFilePath}}}`); parent folders are created automatically.
+{{/if}}
+{{#if (eq sqlBootstrap "connection_url")}}
+## Database connection
+
+Set `{{{databaseUrlEnvVar}}}` in `.env` to your existing Postgres (or compatible) URL.
+{{/if}}
+{{/if}}
+
+## Layout
+
+| Path | Purpose |
+|------|---------|
+| `src/agents/` | Orchestration for the selected design pattern |
+| `src/tools/` | Tool definitions (AI SDK) |
+| `src/memory/` | Memory backends |
+| `src/prompts/` | System / assistant instructions |
+| `src/knowledge/` | Knowledge & vector stubs |
+| `src/llm/` | Provider model factory (Vercel AI SDK) |
+| `agent.scaffold.json` | Exact answers from the TUI wizard |
+
+## MCP / Claude Code
+
+- See `claude-handoff.md` for suggested follow-up tasks with Claude Code.
+- MCP config example (Cursor-style): `config/mcp.example.json` if present.
+
+## Safety
+
+- Review tool implementations before enabling `run_command` or broad HTTP/file access.

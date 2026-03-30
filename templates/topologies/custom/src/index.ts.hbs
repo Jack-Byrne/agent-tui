@@ -1,0 +1,12 @@
+import { runCustomOrchestrator } from "./agents/custom-orchestrator.js";
+
+const input =
+  process.argv.slice(2).join(" ") ||
+  "parallel perspectives on adopting microservices for our small team";
+
+runCustomOrchestrator(input)
+  .then(console.log)
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });

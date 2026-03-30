@@ -1,0 +1,27 @@
+import { tool } from "ai";
+import { z } from "zod";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
+
+export const runCommandTool = tool({
+  description: "Run a shell command (DANGEROUS — gated by env).",
+  parameters: z.object({
+    cmd: z.string(),
+    args: z.array(z.string()).default([]),
+  }),
+  execute: async ({ cmd, args }) => {
+    if (process.env.ALLOW_RUN_COMMAND !== "true") {
+      return {
+        error: "Refusing to run commands unless ALLOW_RUN_COMMAND=true",
+        cmd,
+        args,
+      };
+    }
+    const { stdout, stderr } = await execFileAsync(cmd, args, {
+      timeout: 10_000,
+    });
+    return { stdout: stdout.slice(0, 8000), stderr: stderr.slice(0, 4000) };
+  },
+});

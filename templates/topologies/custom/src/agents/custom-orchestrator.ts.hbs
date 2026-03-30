@@ -1,0 +1,62 @@
+import { generateText } from "ai";
+import { createLanguageModel, llmDefaults } from "../llm/create-model.js";
+import { systemPrompt } from "../prompts/prompts.js";
+
+/**
+ * Custom logic pattern: code-first branching (mix sequential + parallel, etc.).
+ * Inspired by the Google doc refund example.
+ * @see {{patternDocUrl}}
+ */
+
+async function runSequential(userInput: string): Promise<string> {
+  const model = createLanguageModel();
+  const first = await generateText({
+    model,
+    temperature: llmDefaults.temperature,
+    maxTokens: 512,
+    system: `${systemPrompt}\n\nSequential branch: summarize.`,
+    prompt: userInput,
+  });
+  const second = await generateText({
+    model,
+    temperature: llmDefaults.temperature,
+    maxTokens: llmDefaults.maxTokens,
+    system: `${systemPrompt}\n\nSequential branch: answer user using summary.`,
+    prompt: `${first.text}`,
+  });
+  return second.text;
+}
+
+async function runParallel(userInput: string): Promise<string> {
+  const model = createLanguageModel();
+  const [a, b] = await Promise.all([
+    generateText({
+      model,
+      temperature: llmDefaults.temperature,
+      maxTokens: 512,
+      system: `${systemPrompt}\n\nParallel branch A: constraints.`,
+      prompt: userInput,
+    }).then((r) => r.text),
+    generateText({
+      model,
+      temperature: llmDefaults.temperature,
+      maxTokens: 512,
+      system: `${systemPrompt}\n\nParallel branch B: opportunities.`,
+      prompt: userInput,
+    }).then((r) => r.text),
+  ]);
+  const merged = await generateText({
+    model,
+    temperature: llmDefaults.temperature,
+    maxTokens: llmDefaults.maxTokens,
+    system: `${systemPrompt}\n\nMerge two analyses.`,
+    prompt: `Q: ${userInput}\nA1:\n${a}\nA2:\n${b}`,
+  });
+  return merged.text;
+}
+
+export async function runCustomOrchestrator(userInput: string): Promise<string> {
+  const wantsParallel = /parallel|debate|perspectives/i.test(userInput);
+  if (wantsParallel) return runParallel(userInput);
+  return runSequential(userInput);
+}

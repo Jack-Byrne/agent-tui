@@ -1,0 +1,13 @@
+import { runSingleAgent } from "./agents/single-agent.js";
+
+const input =
+  process.argv.slice(2).join(" ") || "Summarize the single-agent pattern in one sentence.";
+
+runSingleAgent(input)
+  .then((text) => {
+    console.log(text);
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });

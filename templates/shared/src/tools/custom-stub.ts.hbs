@@ -1,0 +1,10 @@
+import { tool } from "ai";
+import { z } from "zod";
+
+export const customStubTool = tool({
+  description: "Custom tool placeholder — replace with your domain logic.",
+  parameters: z.object({
+    input: z.string(),
+  }),
+  execute: async ({ input }) => ({ echo: input }),
+});

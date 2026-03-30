@@ -1,0 +1,14 @@
+import { tool } from "ai";
+import { z } from "zod";
+
+export const httpFetchTool = tool({
+  description: "HTTP GET for allowed URLs (scaffold — tighten allowlist before production).",
+  parameters: z.object({
+    url: z.string().url(),
+  }),
+  execute: async ({ url }) => {
+    const res = await fetch(url);
+    const text = await res.text();
+    return { status: res.status, bodyPreview: text.slice(0, 4000) };
+  },
+});

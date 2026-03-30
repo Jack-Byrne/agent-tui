@@ -1,0 +1,38 @@
+import { generateText } from "ai";
+import { createLanguageModel, llmDefaults } from "../llm/create-model.js";
+import { systemPrompt } from "../prompts/prompts.js";
+
+/**
+ * Multi-agent parallel: fan-out perspectives then merge.
+ * @see {{patternDocUrl}}
+ */
+async function perspective(kind: string, input: string): Promise<string> {
+  const model = createLanguageModel();
+  const { text } = await generateText({
+    model,
+    temperature: llmDefaults.temperature,
+    maxTokens: Math.min(llmDefaults.maxTokens, 1024),
+    system: `${systemPrompt}\n\nPerspective: ${kind}. Be concise.`,
+    prompt: input,
+  });
+  return text;
+}
+
+export async function runParallelBatch(userInput: string): Promise<string> {
+  const [safety, cost, ux] = await Promise.all([
+    perspective("risk / safety", userInput),
+    perspective("cost / efficiency", userInput),
+    perspective("user experience", userInput),
+  ]);
+
+  const model = createLanguageModel();
+  const { text } = await generateText({
+    model,
+    temperature: llmDefaults.temperature,
+    maxTokens: llmDefaults.maxTokens,
+    system: `${systemPrompt}\n\nMerge competing perspectives into one recommendation.`,
+    prompt: `Question: ${userInput}\n\nSafety:\n${safety}\n\nCost:\n${cost}\n\nUX:\n${ux}`,
+  });
+
+  return text;
+}

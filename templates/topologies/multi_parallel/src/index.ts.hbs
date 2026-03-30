@@ -1,0 +1,11 @@
+import { runParallelBatch } from "./agents/parallel-batch.js";
+
+const input =
+  process.argv.slice(2).join(" ") || "Should we launch this feature next week?";
+
+runParallelBatch(input)
+  .then(console.log)
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });

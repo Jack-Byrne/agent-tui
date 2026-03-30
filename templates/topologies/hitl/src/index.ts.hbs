@@ -1,0 +1,11 @@
+import { runHitlAgent } from "./agents/hitl-agent.js";
+
+const input =
+  process.argv.slice(2).join(" ") || "Draft a message to the team about the release.";
+
+runHitlAgent(input)
+  .then(console.log)
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
