@@ -1,0 +1,9 @@
+{{#if useSqlDatabase}}
+import { touchDatabase } from "../db/drizzle-stub.js";
+
+const ok = await touchDatabase();
+console.log(ok ? "sql_smoke_ok" : "sql_smoke_failed");
+if (!ok) process.exitCode = 1;
+{{else}}
+console.log("sql_smoke_skipped");
+{{/if}}

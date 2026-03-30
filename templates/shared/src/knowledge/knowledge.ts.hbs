@@ -1,16 +1,84 @@
 /**
- * Knowledge / RAG stub. Setting: {{knowledge}} (vector: {{vectorBackend}})
+ * Knowledge / RAG — setting: {{knowledge}} (vector backend: {{vectorBackend}})
  */
-
+{{#if (eq knowledge "none")}}
 export async function retrieveContext(_query: string): Promise<string> {
   void _query;
-{{#if (eq knowledge "none")}}
   return "";
-{{/if}}
-{{#if (eq knowledge "filesystem_rag_stub")}}
-  return "[filesystem RAG stub — index files under ./knowledge and embed]";
-{{/if}}
-{{#if (eq knowledge "vector_db")}}
-  return "[vector DB stub — implement pgvector or similar]";
-{{/if}}
 }
+{{/if}}
+
+{{#if (eq knowledge "filesystem_rag_stub")}}
+export async function retrieveContext(_query: string): Promise<string> {
+  void _query;
+  return "[filesystem RAG stub — index files under ./knowledge and embed]";
+}
+{{/if}}
+
+{{#if (eq knowledge "vector_db")}}
+{{#if (eq vectorBackend "stub")}}
+export async function retrieveContext(_query: string): Promise<string> {
+  void _query;
+  return "[vector DB stub — implement a real backend]";
+}
+{{/if}}
+{{#if (eq vectorBackend "pgvector")}}
+{{#if useSqlDatabase}}
+{{#if (eq sqlBootstrap "sqlite_file")}}
+export async function retrieveContext(_query: string): Promise<string> {
+  void _query;
+  return "[pgvector requires Postgres; align SQLite knowledge per project README]";
+}
+{{else}}
+import { embed } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
+import { rawPgPool } from "../db/drizzle-stub.js";
+
+const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL ?? "text-embedding-3-small";
+const ragTopK = Math.max(1, Math.min(20, Math.floor(Number(process.env.RAG_TOP_K ?? "3"))));
+
+let ragTableReady = false;
+
+async function ensureRagTable(): Promise<void> {
+  if (ragTableReady || !rawPgPool) return;
+  await rawPgPool.query(`CREATE EXTENSION IF NOT EXISTS vector;`);
+  await rawPgPool.query(`
+    CREATE TABLE IF NOT EXISTS agent_knowledge_chunks (
+      id BIGSERIAL PRIMARY KEY,
+      content TEXT NOT NULL,
+      embedding vector(1536) NOT NULL
+    );
+  `);
+  ragTableReady = true;
+}
+
+export async function retrieveContext(query: string): Promise<string> {
+  if (!process.env.OPENAI_API_KEY) {
+    return "[pgvector RAG needs OPENAI_API_KEY for embeddings]";
+  }
+  await ensureRagTable();
+  if (!rawPgPool) return "";
+  const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const { embedding } = await embed({
+    model: openai.embedding(EMBEDDING_MODEL),
+    value: query,
+  });
+  const vectorLiteral = `[${embedding.join(",")}]`;
+  const { rows } = await rawPgPool.query<{ content: string }>(
+    `SELECT content FROM agent_knowledge_chunks
+     ORDER BY embedding <=> $1::vector
+     LIMIT ${ragTopK}`,
+    [vectorLiteral],
+  );
+  if (rows.length === 0) return "";
+  return rows.map((r) => r.content).join("\n---\n");
+}
+{{/if}}
+{{else}}
+export async function retrieveContext(_query: string): Promise<string> {
+  void _query;
+  return "[vector_db + pgvector needs SQL + Postgres in scaffold]";
+}
+{{/if}}
+{{/if}}
+{{/if}}

@@ -1,6 +1,8 @@
 node_modules/
 dist/
 out/
+integration-out/
+integration/.env
 *.log
 .env
 .DS_Store

@@ -1,6 +1,12 @@
 import { generateText } from "ai";
 import { createLanguageModel, llmDefaults } from "../llm/create-model.js";
 import { systemPrompt } from "../prompts/prompts.js";
+import {
+  appendAssistant,
+  appendUser,
+  loadSession,
+  persistSession,
+} from "../memory/memory.js";
 
 /**
  * Custom logic pattern: code-first branching (mix sequential + parallel, etc.).
@@ -56,7 +62,13 @@ async function runParallel(userInput: string): Promise<string> {
 }
 
 export async function runCustomOrchestrator(userInput: string): Promise<string> {
+  const session = await loadSession();
+  appendUser(session, userInput);
   const wantsParallel = /parallel|debate|perspectives/i.test(userInput);
-  if (wantsParallel) return runParallel(userInput);
-  return runSequential(userInput);
+  const out = wantsParallel
+    ? await runParallel(userInput)
+    : await runSequential(userInput);
+  appendAssistant(session, out);
+  await persistSession(session);
+  return out;
 }

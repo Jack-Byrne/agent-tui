@@ -1,20 +1,298 @@
 /**
- * Memory backend stub — wire to your store (session, file, redis, sql).
- * Scaffold setting: {{memory}}
+ * Memory backend — scaffold setting: {{memory}}
+ * Session id: AGENT_SESSION_ID (default "default"). Redis: REDIS_URL. File: MEMORY_FILE_PATH.
  */
+import type { CoreMessage } from "ai";
+{{#if (eq memory "redis")}}
+import Redis from "ioredis";
+{{/if}}
 
-export interface MemorySession {
-  messages: { role: "user" | "assistant" | "system"; content: string }[];
+export interface AgentMemorySession {
+  messages: CoreMessage[];
 }
 
-export function createMemory(): MemorySession {
+export function getSessionId(): string {
+  return process.env.AGENT_SESSION_ID ?? "default";
+}
+
+{{#if (eq memory "none")}}
+export async function loadSession(): Promise<AgentMemorySession> {
   return { messages: [] };
 }
 
-export function appendUser(session: MemorySession, content: string) {
+export function appendUser(session: AgentMemorySession, content: string): void {
   session.messages.push({ role: "user", content });
 }
 
-export function appendAssistant(session: MemorySession, content: string) {
+export function appendAssistant(session: AgentMemorySession, content: string): void {
   session.messages.push({ role: "assistant", content });
 }
+
+export async function persistSession(_session: AgentMemorySession): Promise<void> {}
+
+export function messagesForModel(session: AgentMemorySession): CoreMessage[] {
+  return session.messages;
+}
+{{/if}}
+
+{{#if (eq memory "conversation")}}
+const conversationStore = new Map<string, CoreMessage[]>();
+
+export async function loadSession(): Promise<AgentMemorySession> {
+  const id = getSessionId();
+  const existing = conversationStore.get(id);
+  if (existing) return { messages: existing };
+  const fresh: CoreMessage[] = [];
+  conversationStore.set(id, fresh);
+  return { messages: fresh };
+}
+
+export function appendUser(session: AgentMemorySession, content: string): void {
+  session.messages.push({ role: "user", content });
+}
+
+export function appendAssistant(session: AgentMemorySession, content: string): void {
+  session.messages.push({ role: "assistant", content });
+}
+
+export async function persistSession(_session: AgentMemorySession): Promise<void> {}
+
+export function messagesForModel(session: AgentMemorySession): CoreMessage[] {
+  return session.messages;
+}
+{{/if}}
+
+{{#if (eq memory "file")}}
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+
+function memoryFilePath(): string {
+  return process.env.MEMORY_FILE_PATH ?? "data/memory-session.json";
+}
+
+export async function loadSession(): Promise<AgentMemorySession> {
+  const path = memoryFilePath();
+  try {
+    const raw = readFileSync(path, "utf8");
+    const parsed = JSON.parse(raw) as { messages?: CoreMessage[] };
+    return { messages: parsed.messages ?? [] };
+  } catch {
+    return { messages: [] };
+  }
+}
+
+export function appendUser(session: AgentMemorySession, content: string): void {
+  session.messages.push({ role: "user", content });
+}
+
+export function appendAssistant(session: AgentMemorySession, content: string): void {
+  session.messages.push({ role: "assistant", content });
+}
+
+export async function persistSession(session: AgentMemorySession): Promise<void> {
+  const path = memoryFilePath();
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify({ sessionId: getSessionId(), messages: session.messages }), "utf8");
+}
+
+export function messagesForModel(session: AgentMemorySession): CoreMessage[] {
+  return session.messages;
+}
+{{/if}}
+
+{{#if (eq memory "redis")}}
+let redisClient: Redis | null = null;
+
+function getRedis(): Redis {
+  if (!redisClient) {
+    redisClient = new Redis(process.env.REDIS_URL ?? "redis://127.0.0.1:6379");
+  }
+  return redisClient;
+}
+
+function redisKey(): string {
+  return `agent-tui:memory:${getSessionId()}`;
+}
+
+export async function loadSession(): Promise<AgentMemorySession> {
+  const r = getRedis();
+  const raw = await r.get(redisKey());
+  if (!raw) return { messages: [] };
+  try {
+    const parsed = JSON.parse(raw) as { messages?: CoreMessage[] };
+    return { messages: parsed.messages ?? [] };
+  } catch {
+    return { messages: [] };
+  }
+}
+
+export function appendUser(session: AgentMemorySession, content: string): void {
+  session.messages.push({ role: "user", content });
+}
+
+export function appendAssistant(session: AgentMemorySession, content: string): void {
+  session.messages.push({ role: "assistant", content });
+}
+
+export async function persistSession(session: AgentMemorySession): Promise<void> {
+  const r = getRedis();
+  await r.set(redisKey(), JSON.stringify({ messages: session.messages }));
+}
+
+export function messagesForModel(session: AgentMemorySession): CoreMessage[] {
+  return session.messages;
+}
+{{/if}}
+
+{{#if (eq memory "db")}}
+{{#if useSqlDatabase}}
+{{#if (eq sqlBootstrap "sqlite_file")}}
+import { rawSqliteDb } from "../db/drizzle-stub.js";
+
+let memoryTableReady = false;
+
+function ensureMemoryTableSqlite(): void {
+  if (memoryTableReady || !rawSqliteDb) return;
+  rawSqliteDb.exec(`
+    CREATE TABLE IF NOT EXISTS agent_memory_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      ord INTEGER NOT NULL
+    );
+  `);
+  memoryTableReady = true;
+}
+
+export async function loadSession(): Promise<AgentMemorySession> {
+  ensureMemoryTableSqlite();
+  const sid = getSessionId();
+  if (!rawSqliteDb) return { messages: [] };
+  const rows = rawSqliteDb
+    .prepare(
+      `SELECT role, content FROM agent_memory_messages WHERE session_id = ? ORDER BY ord ASC`,
+    )
+    .all(sid) as { role: string; content: string }[];
+  const messages: CoreMessage[] = rows.map((r) => ({
+    role: r.role as "user" | "assistant" | "system",
+    content: r.content,
+  }));
+  return { messages };
+}
+
+export function appendUser(session: AgentMemorySession, content: string): void {
+  session.messages.push({ role: "user", content });
+}
+
+export function appendAssistant(session: AgentMemorySession, content: string): void {
+  session.messages.push({ role: "assistant", content });
+}
+
+export async function persistSession(session: AgentMemorySession): Promise<void> {
+  ensureMemoryTableSqlite();
+  const sid = getSessionId();
+  if (!rawSqliteDb) return;
+  const del = rawSqliteDb.prepare(`DELETE FROM agent_memory_messages WHERE session_id = ?`);
+  del.run(sid);
+  const ins = rawSqliteDb.prepare(
+    `INSERT INTO agent_memory_messages (session_id, role, content, ord) VALUES (?, ?, ?, ?)`,
+  );
+  session.messages.forEach((m, i) => {
+    if (m.role === "system") return;
+    const content =
+      typeof m.content === "string"
+        ? m.content
+        : JSON.stringify(m.content);
+    ins.run(sid, m.role, content, i);
+  });
+}
+
+export function messagesForModel(session: AgentMemorySession): CoreMessage[] {
+  return session.messages;
+}
+{{else}}
+import { rawPgPool } from "../db/drizzle-stub.js";
+
+let memoryTableReadyPg = false;
+
+async function ensureMemoryTablePg(): Promise<void> {
+  if (memoryTableReadyPg || !rawPgPool) return;
+  await rawPgPool.query(`
+    CREATE TABLE IF NOT EXISTS agent_memory_messages (
+      id SERIAL PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      ord INTEGER NOT NULL
+    );
+  `);
+  memoryTableReadyPg = true;
+}
+
+export async function loadSession(): Promise<AgentMemorySession> {
+  await ensureMemoryTablePg();
+  const sid = getSessionId();
+  if (!rawPgPool) return { messages: [] };
+  const { rows } = await rawPgPool.query<{ role: string; content: string }>(
+    `SELECT role, content FROM agent_memory_messages WHERE session_id = $1 ORDER BY ord ASC`,
+    [sid],
+  );
+  const messages: CoreMessage[] = rows.map((r) => ({
+    role: r.role as "user" | "assistant" | "system",
+    content: r.content,
+  }));
+  return { messages };
+}
+
+export function appendUser(session: AgentMemorySession, content: string): void {
+  session.messages.push({ role: "user", content });
+}
+
+export function appendAssistant(session: AgentMemorySession, content: string): void {
+  session.messages.push({ role: "assistant", content });
+}
+
+export async function persistSession(session: AgentMemorySession): Promise<void> {
+  await ensureMemoryTablePg();
+  const sid = getSessionId();
+  if (!rawPgPool) return;
+  await rawPgPool.query(`DELETE FROM agent_memory_messages WHERE session_id = $1`, [sid]);
+  let ord = 0;
+  for (const m of session.messages) {
+    if (m.role === "system") continue;
+    const content =
+      typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+    await rawPgPool.query(
+      `INSERT INTO agent_memory_messages (session_id, role, content, ord) VALUES ($1, $2, $3, $4)`,
+      [sid, m.role, content, ord],
+    );
+    ord += 1;
+  }
+}
+
+export function messagesForModel(session: AgentMemorySession): CoreMessage[] {
+  return session.messages;
+}
+{{/if}}
+{{else}}
+/** DB memory requires SQL + Drizzle in scaffold — falling back to in-process session (one shot). */
+export async function loadSession(): Promise<AgentMemorySession> {
+  return { messages: [] };
+}
+
+export function appendUser(session: AgentMemorySession, content: string): void {
+  session.messages.push({ role: "user", content });
+}
+
+export function appendAssistant(session: AgentMemorySession, content: string): void {
+  session.messages.push({ role: "assistant", content });
+}
+
+export async function persistSession(_session: AgentMemorySession): Promise<void> {}
+
+export function messagesForModel(session: AgentMemorySession): CoreMessage[] {
+  return session.messages;
+}
+{{/if}}
+{{/if}}

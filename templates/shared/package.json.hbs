@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node dist/index.js",
-    "build": "tsc"
+    "build": "tsc"{{#if useSqlDatabase}},
+    "sql:smoke": "node dist/scripts/sql-smoke.js"{{/if}}
   },
   "dependencies": {
     "ai": "^4.1.14",
@@ -18,7 +19,8 @@
     "drizzle-orm": "^0.40.0"{{#if (eq sqlBootstrap "sqlite_file")}},
     "better-sqlite3": "^11.7.0"{{else}},
     "pg": "^8.14.1"{{/if}}{{/if}}{{#if (eq vectorBackend "pgvector")}},
-    "pgvector": "^0.2.0"{{/if}}
+    "pgvector": "^0.2.0"{{/if}}{{#if (eq memory "redis")}},
+    "ioredis": "^5.4.2"{{/if}}
   },
   "devDependencies": {
     "@types/node": "^22.13.10"{{#if useSqlDatabase}}{{#if (eq sqlBootstrap "sqlite_file")}},

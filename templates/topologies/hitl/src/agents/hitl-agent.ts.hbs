@@ -2,26 +2,53 @@ import { generateText } from "ai";
 import { createLanguageModel, llmDefaults } from "../llm/create-model.js";
 import { getTools } from "../tools/registry.js";
 import { systemPrompt } from "../prompts/prompts.js";
+import {
+  appendAssistant,
+  appendUser,
+  loadSession,
+  messagesForModel,
+  persistSession,
+} from "../memory/memory.js";
 
 /**
  * Human-in-the-loop: scaffold pauses for approval via env gate.
  * Integrate your own UI / ticketing instead of SKIP_HITL in production.
  * @see {{patternDocUrl}}
  */
+
+function hitlMaxSteps(hasTools: boolean): number {
+  let m = 1;
+{{#if (eq planning "react_loop")}}
+  if (hasTools) m = 4;
+{{/if}}
+{{#if (eq planning "planner_executor_stub")}}
+  if (hasTools) m = 4;
+{{/if}}
+  return m;
+}
+
 export async function runHitlAgent(userInput: string): Promise<string> {
   const model = createLanguageModel();
   const tools = getTools();
   const toolMap = Object.keys(tools).length ? tools : undefined;
+  const hasTools = Boolean(toolMap);
+
+  const session = await loadSession();
+  appendUser(session, userInput);
+  const messages = messagesForModel(session);
 
   const draft = await generateText({
     model,
     temperature: llmDefaults.temperature,
     maxTokens: llmDefaults.maxTokens,
     system: `${systemPrompt}\n\nProduce a draft; a human must approve before execution.`,
-    prompt: userInput,
+    messages,
     tools: toolMap,
-    maxSteps: toolMap ? 4 : 1,
+    maxSteps: hitlMaxSteps(hasTools),
   });
+
+  appendAssistant(session, draft.text);
+  await persistSession(session);
 
   if (process.env.SKIP_HITL === "true") {
     return draft.text;

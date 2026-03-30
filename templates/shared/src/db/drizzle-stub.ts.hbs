@@ -11,10 +11,12 @@ import { dirname } from "node:path";
 const sqlitePath = process.env.SQLITE_PATH ?? "{{sqliteFilePath}}";
 mkdirSync(dirname(sqlitePath), { recursive: true });
 const sqlite = new Database(sqlitePath);
+export const rawSqliteDb: InstanceType<typeof Database> = sqlite;
 export const db = drizzle(sqlite);
+export const rawPgPool = null as null;
 {{else}}
 /**
- * Drizzle + Postgres stub — add schema and migrations for your workload.
+ * Drizzle + Postgres — add schema and migrations for your workload.
  */
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
@@ -23,8 +25,32 @@ const pool = new pg.Pool({
   connectionString: process.env["{{databaseUrlEnvVar}}"],
 });
 
+export const rawPgPool: pg.Pool = pool;
 export const db = drizzle(pool);
+export const rawSqliteDb = null as null;
 {{/if}}
+
+/**
+ * Cheap connectivity check for integration tests.
+ */
+export async function touchDatabase(): Promise<boolean> {
+  try {
+{{#if (eq sqlBootstrap "sqlite_file")}}
+    rawSqliteDb?.prepare("SELECT 1").get();
 {{else}}
-export {};
+    await rawPgPool?.query("SELECT 1");
+{{/if}}
+    return true;
+  } catch {
+    return false;
+  }
+}
+{{else}}
+export const db = undefined;
+export const rawSqliteDb = null as null;
+export const rawPgPool = null as null;
+
+export async function touchDatabase(): Promise<boolean> {
+  return false;
+}
 {{/if}}

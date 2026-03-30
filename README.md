@@ -223,11 +223,76 @@ Vector choice (`pgvector`) is otherwise separate: it only adds the **`pgvector`*
 
 **`agent.scaffold.json`** stores every answer above (`patternId`, `llm`, `memory`, `planning`, `sqlBootstrap`, `sqliteFilePath`, …) plus `scaffoldVersion`, `generatedAt`, and `googlePatternGuide` (link to the same Google doc). Use it for reproducible regenerations or tooling.
 
+## Integration testing (generated agents)
+
+Generated apps support an **offline mock LLM** via `AGENT_TUI_MOCK_LLM=1` and scenario scripts in [`templates/shared/src/llm/mock-language-model.ts`](templates/shared/src/llm/mock-language-model.ts) (`AGENT_TUI_MOCK_SCENARIO`, `AGENT_TUI_MOCK_TEXT`, …). **Live** runs use real provider keys from `.env` (Ollama is out of scope for this matrix).
+
+**Master env + Docker (optional):** copy [`integration/env.example`](integration/env.example) to `integration/.env` (gitignored), then start [`integration/docker-compose.yml`](integration/docker-compose.yml) for Redis and Postgres/pgvector. [`integration/merge-env.ts`](integration/merge-env.ts) merges that file into each fixture when you run the harness.
+
+**Commands:**
+
+```bash
+npm test                         # unit tests only (fast)
+npm run test:integration         # mock LLM, quick scenario subset (~6); uses fresh temp dirs per run
+npm run test:integration:all     # all scenarios below (skips Redis scenario unless REDIS_URL is set)
+npm run integration:generate     # write ./integration-out/<id>/ (or AGENT_TUI_INTEGRATION_OUT); optional: scenario id arg
+npm run integration:run          # mock LLM against integration-out/ (reuses existing dirs — npm install skips work from cache)
+AGENT_TUI_LIVE_LLM=1 npm run integration:run   # live providers (requires keys in integration/.env)
+AGENT_TUI_INTEGRATION_CLEAN=1 npm run integration:run   # delete each fixture dir before regenerate (slow, pristine tree)
+```
+
+By default, **`integration/run.ts` does not delete** `integration-out/<scenario-id>/`, so repeat runs keep **`node_modules`** and are usually much faster. `generateProject` still overwrites generated sources on each run. Set **`AGENT_TUI_INTEGRATION_CLEAN=1`** when you need a completely clean directory (e.g. dependency changes).
+
+**Redis + Postgres/pgvector (Docker Compose):** from the repo root, bring up [`integration/docker-compose.yml`](integration/docker-compose.yml). Use whichever command your install supports (many distros only have the older **hyphen** binary):
+
+```bash
+docker compose -f integration/docker-compose.yml up -d    # Compose V2 (plugin)
+docker-compose -f integration/docker-compose.yml up -d      # Compose v1 standalone
+```
+
+Published host ports are **`16379` → Redis** and **`15432` → Postgres** so they do not collide with typical local services on **`6379`** / **`5432`**. Match [`integration/env.example`](integration/env.example): `REDIS_URL` on `16379`, `DATABASE_URL` on `15432`.
+
+**Ubuntu + stock `docker.io`:** you may see `docker: unknown command: docker compose` and `Unable to locate package docker-compose-plugin`. The plugin comes from [Docker’s APT repo](https://docs.docker.com/engine/install/ubuntu/), or install a [Compose v2 release binary](https://github.com/docker/compose/releases) as `docker-compose` under `/usr/local/bin`.
+
+**Ubuntu 24.04 + `apt install docker-compose`:** that package is Compose **1.29** (Python) and often crashes with `ModuleNotFoundError: No module named 'distutils'` on Python 3.12. Remove it and use the **GitHub binary** or Docker’s **`docker-compose-plugin`** from Docker’s APT repo instead.
+
+Then export **`REDIS_URL`**, **`DATABASE_URL`**, and **`OPENAI_API_KEY`** (see [`integration/env.example`](integration/env.example)). With those set:
+
+- **`memory-redis`** — runs the agent with Redis-backed memory and asserts the session key has persisted messages.
+- **`knowledge-pgvector-postgres`** — seeds `agent_knowledge_chunks`, runs the agent, then asserts **`retrieveContext`** returns the seeded text (real embedding API call).
+
+Without those env vars, Vitest **skips** those scenarios (other integration tests still run).
+
+**Scenario status matrix** (update as you verify live / services):
+
+| Scenario id | Mock (CI quick) | Mock (full suite) | Live LLM | Services | Notes |
+|-------------|-----------------|-------------------|----------|---------|-------|
+| single-default | yes | yes | manual | none | Conversation memory |
+| single-tools-http | yes | yes | manual | none | HTTP tool + mock tool round-trip |
+| single-production-prompt | — | yes | manual | none | Production prompt pack |
+| react-tool-loop | yes | yes | manual | none | ReAct + tools |
+| sequential-pipeline | yes | yes | manual | none | Multi-stage pipeline |
+| parallel-batch | — | yes | manual | none | Parallel fan-out |
+| coordinator-routing | — | yes | manual | none | Mock classify uses token heuristic |
+| hitl-skip | — | yes | manual | none | Uses `SKIP_HITL=true` in test env |
+| custom-orchestrator | — | yes | manual | none | Custom branch |
+| planner-executor | — | yes | manual | none | `planner_executor_stub` + `planner_stub` mock |
+| memory-file-persist | — | yes | manual | none | `MEMORY_FILE_PATH` |
+| memory-db-sqlite | — | yes | manual | none | SQLite + Drizzle memory table |
+| memory-redis | skip without `REDIS_URL` | yes when `REDIS_URL` | manual | Redis | Asserts Redis key after run |
+| sql-sqlite-smoke | yes | yes | manual | none | `npm run sql:smoke` |
+| knowledge-pgvector-postgres | skip without DB+key | yes when `DATABASE_URL` + `OPENAI_API_KEY` | manual | Postgres | Seed + `retrieveContext` assert |
+| knowledge-fs-stub | — | yes | manual | none | Filesystem RAG stub in prompt chain |
+| mcp-skeleton | yes | yes | manual | none | Builds `mcp-servers/custom` (echo tool) |
+
+**Pgvector:** scenario **`knowledge-pgvector-postgres`** exercises the generated pgvector path when Docker Postgres and `OPENAI_API_KEY` are available (see above).
+
 ## Development
 
 ```bash
 npm run dev -- create -o ./out   # run CLI via tsx (no build step)
-npm test                         # Vitest (schemas + generator layout tests)
+npm test                         # Vitest: schemas + generator layout (excludes integration/)
+npm run test:integration         # generated agent smoke (mock LLM)
 npm run build                    # compile to dist/
 ```
 
@@ -243,7 +308,8 @@ npm run build                    # compile to dist/
 | `templates/shared/` | Files shared by all generated projects |
 | `templates/topologies/` | Per-topology `src/agents` and entrypoint |
 | `templates/mcp-skeleton/` | Optional MCP server stub |
-| `tests/` | Schema and generator tests |
+| `integration/` | Docker/env templates, scenario definitions, generate + run scripts |
+| `tests/` | Schema, generator, and integration harness tests |
 
 ## License
 

@@ -1,14 +1,25 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
 
 /**
- * Minimal MCP server skeleton for {{projectName}}.
- * Extend with tools/resources per MCP docs.
+ * MCP server skeleton for {{projectName}} — includes an `echo` tool for smoke tests.
  */
 const server = new McpServer({
   name: "{{projectName}}-custom",
   version: "0.1.0",
 });
+
+server.registerTool(
+  "echo",
+  {
+    description: "Echo a message (integration smoke test).",
+    inputSchema: { message: z.string() },
+  },
+  async ({ message }) => ({
+    content: [{ type: "text" as const, text: message }],
+  }),
+);
 
 async function main() {
   const transport = new StdioServerTransport();

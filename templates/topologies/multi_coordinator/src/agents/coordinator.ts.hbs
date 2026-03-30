@@ -1,6 +1,12 @@
 import { generateText } from "ai";
 import { createLanguageModel, llmDefaults } from "../llm/create-model.js";
 import { systemPrompt } from "../prompts/prompts.js";
+import {
+  appendAssistant,
+  appendUser,
+  loadSession,
+  persistSession,
+} from "../memory/memory.js";
 import * as searchWorker from "./workers/search.js";
 import * as calcWorker from "./workers/calc.js";
 import * as writeWorker from "./workers/write.js";
@@ -26,9 +32,17 @@ async function classify(task: string): Promise<"search" | "calc" | "write"> {
 }
 
 export async function runCoordinator(userInput: string): Promise<string> {
+  const session = await loadSession();
+  appendUser(session, userInput);
   const route = await classify(userInput);
-  if (route === "calc") return calcWorker.calcWorker(userInput);
-  if (route === "write") return writeWorker.writeWorker(userInput);
-  const researched = await searchWorker.searchWorker(userInput);
-  return writeWorker.writeWorker(`Synthesize for user.\n${researched}`);
+  let out: string;
+  if (route === "calc") out = await calcWorker.calcWorker(userInput);
+  else if (route === "write") out = await writeWorker.writeWorker(userInput);
+  else {
+    const researched = await searchWorker.searchWorker(userInput);
+    out = await writeWorker.writeWorker(`Synthesize for user.\n${researched}`);
+  }
+  appendAssistant(session, out);
+  await persistSession(session);
+  return out;
 }

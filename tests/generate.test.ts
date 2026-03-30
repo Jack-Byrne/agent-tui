@@ -57,6 +57,7 @@ describe("generateProject", () => {
     expect(files).toContain("agent.scaffold.json");
     expect(files).toContain("src/index.ts");
     expect(files).toContain("src/agents/single-agent.ts");
+    expect(files).toContain("src/llm/mock-language-model.ts");
     expect(files).toContain("config/mcp.example.json");
   });
 
@@ -110,6 +111,7 @@ describe("generateProject", () => {
       }),
     );
     const proj = join(parent, "fixture-agent");
+    const files = await listFiles(proj);
     const pkg = await fs.readJSON(join(proj, "package.json"));
     expect(pkg.dependencies["better-sqlite3"]).toBeDefined();
     expect(pkg.dependencies.pg).toBeUndefined();
@@ -118,5 +120,6 @@ describe("generateProject", () => {
     const stub = await fs.readFile(join(proj, "src/db/drizzle-stub.ts"), "utf8");
     expect(stub).toContain("better-sqlite3");
     expect(stub).toContain("data/app.db");
+    expect(files).toContain("src/scripts/sql-smoke.ts");
   });
 });

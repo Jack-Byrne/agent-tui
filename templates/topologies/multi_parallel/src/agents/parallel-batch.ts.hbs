@@ -1,6 +1,12 @@
 import { generateText } from "ai";
 import { createLanguageModel, llmDefaults } from "../llm/create-model.js";
 import { systemPrompt } from "../prompts/prompts.js";
+import {
+  appendAssistant,
+  appendUser,
+  loadSession,
+  persistSession,
+} from "../memory/memory.js";
 
 /**
  * Multi-agent parallel: fan-out perspectives then merge.
@@ -19,6 +25,8 @@ async function perspective(kind: string, input: string): Promise<string> {
 }
 
 export async function runParallelBatch(userInput: string): Promise<string> {
+  const session = await loadSession();
+  appendUser(session, userInput);
   const [safety, cost, ux] = await Promise.all([
     perspective("risk / safety", userInput),
     perspective("cost / efficiency", userInput),
@@ -34,5 +42,7 @@ export async function runParallelBatch(userInput: string): Promise<string> {
     prompt: `Question: ${userInput}\n\nSafety:\n${safety}\n\nCost:\n${cost}\n\nUX:\n${ux}`,
   });
 
+  appendAssistant(session, text);
+  await persistSession(session);
   return text;
 }

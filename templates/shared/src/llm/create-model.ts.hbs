@@ -3,11 +3,16 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAzure } from "@ai-sdk/azure";
 import type { LanguageModelV1 } from "ai";
+import { createMockLanguageModelIfEnabled } from "./mock-language-model.js";
 
 /**
  * Model factory from scaffold answers — uses process.env per `agent.scaffold.json`.
+ * Set AGENT_TUI_MOCK_LLM=1 for integration / offline runs (see mock-language-model.ts).
  */
 export function createLanguageModel(): LanguageModelV1 {
+  const mock = createMockLanguageModelIfEnabled();
+  if (mock) return mock;
+
   const provider = "{{llm.provider}}" as
     | "openai"
     | "anthropic"

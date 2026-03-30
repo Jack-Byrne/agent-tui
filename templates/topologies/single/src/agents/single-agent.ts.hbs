@@ -1,28 +1,89 @@
 import { generateText } from "ai";
+import type { CoreMessage } from "ai";
 import { createLanguageModel, llmDefaults } from "../llm/create-model.js";
 import { getTools } from "../tools/registry.js";
 import { systemPrompt } from "../prompts/prompts.js";
 import { retrieveContext } from "../knowledge/knowledge.js";
+import {
+  appendAssistant,
+  appendUser,
+  loadSession,
+  messagesForModel,
+  persistSession,
+} from "../memory/memory.js";
 
 /**
  * Single-agent pattern: one model orchestrates tools + prompt.
  * @see {{patternDocUrl}}
  */
+
+function singleAgentMaxSteps(hasTools: boolean): number {
+  let m = 1;
+{{#if (eq planning "react_loop")}}
+  if (hasTools) m = 8;
+{{/if}}
+{{#if (eq planning "planner_executor_stub")}}
+  if (hasTools) m = 8;
+{{/if}}
+  return m;
+}
+
 export async function runSingleAgent(userInput: string): Promise<string> {
   const model = createLanguageModel();
   const tools = getTools();
   const knowledge = await retrieveContext(userInput);
   const toolMap = Object.keys(tools).length ? tools : undefined;
+  const hasTools = Boolean(toolMap);
+
+  const session = await loadSession();
+  appendUser(session, userInput);
+  const baseMessages = messagesForModel(session);
+
+{{#if (eq planning "planner_executor_stub")}}
+  const planResult = await generateText({
+    model,
+    temperature: llmDefaults.temperature,
+    maxTokens: Math.min(llmDefaults.maxTokens, 512),
+    system: `${systemPrompt}\n\nYou are a planner. Reply with a short numbered plan only (no tools).`,
+    messages: baseMessages,
+  });
+
+  const execMessages: CoreMessage[] = [
+    ...baseMessages,
+    { role: "assistant", content: planResult.text },
+    {
+      role: "user",
+      content:
+        "Execute that plan for the user's request. Use tools only when they clearly help.",
+    },
+  ];
 
   const result = await generateText({
     model,
     temperature: llmDefaults.temperature,
     maxTokens: llmDefaults.maxTokens,
-    system: `${systemPrompt}\n\nKnowledge context:\n${knowledge}`,
-    prompt: userInput,
+    system: `${systemPrompt}\n\nKnowledge context:\n${knowledge}\n\nExecutor: follow the plan; call tools when needed.`,
+    messages: execMessages,
     tools: toolMap,
-    maxSteps: toolMap ? 8 : 1,
+    maxSteps: singleAgentMaxSteps(hasTools),
   });
 
+  appendAssistant(session, result.text);
+  await persistSession(session);
   return result.text;
+{{else}}
+  const result = await generateText({
+    model,
+    temperature: llmDefaults.temperature,
+    maxTokens: llmDefaults.maxTokens,
+    system: `${systemPrompt}\n\nKnowledge context:\n${knowledge}`,
+    messages: baseMessages,
+    tools: toolMap,
+    maxSteps: singleAgentMaxSteps(hasTools),
+  });
+
+  appendAssistant(session, result.text);
+  await persistSession(session);
+  return result.text;
+{{/if}}
 }

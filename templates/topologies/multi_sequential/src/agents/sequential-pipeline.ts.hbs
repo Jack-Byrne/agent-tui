@@ -1,6 +1,12 @@
 import { generateText } from "ai";
 import { createLanguageModel, llmDefaults } from "../llm/create-model.js";
 import { systemPrompt } from "../prompts/prompts.js";
+import {
+  appendAssistant,
+  appendUser,
+  loadSession,
+  persistSession,
+} from "../memory/memory.js";
 
 /**
  * Multi-agent sequential: fixed stages (extract → transform → respond).
@@ -44,7 +50,12 @@ async function stageRespond(plan: string): Promise<string> {
 }
 
 export async function runSequentialPipeline(userInput: string): Promise<string> {
+  const session = await loadSession();
+  appendUser(session, userInput);
   const a = await stageExtract(userInput);
   const b = await stageTransform(a);
-  return stageRespond(b);
+  const out = await stageRespond(b);
+  appendAssistant(session, out);
+  await persistSession(session);
+  return out;
 }

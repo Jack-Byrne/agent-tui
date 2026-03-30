@@ -1,0 +1,19 @@
+# Optional stack for integration tests (Redis memory, Postgres + pgvector RAG).
+# Start (Compose V2 plugin): docker compose -f integration/docker-compose.yml up -d
+# Start (standalone v1):     docker-compose -f integration/docker-compose.yml up -d
+services:
+  redis:
+    image: redis:7-alpine
+    # Host 16379 avoids conflict with a local Redis on 6379 (common on dev machines).
+    ports:
+      - "16379:6379"
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: agent
+    # Host 15432 avoids conflict with a local Postgres on 5432.
+    ports:
+      - "15432:5432"
