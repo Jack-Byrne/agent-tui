@@ -221,4 +221,33 @@ export function currentStep(state: WizardState): WizardStep {
   return STEP_ORDER[state.stepIndex] ?? "summary";
 }
 
+/** Reset wizard state when re-entering Create from the main menu. */
+export function resetWizard(): void {
+  useWizardStore.setState({
+    stepIndex: 0,
+    projectName: "my-agent",
+    patternId: null,
+    llmProvider: "openai",
+    llmModel: defaultModelForProvider("openai"),
+    llmTemperature: 0.2,
+    llmMaxTokens: 4096,
+    llmBaseUrl: "",
+    memory: "conversation",
+    planning: "react_loop",
+    prompts: "minimal",
+    knowledge: "none",
+    vectorBackend: "stub",
+    tools: new Set<ToolId>(),
+    mcpServers: [],
+    includeMcpServerSkeleton: false,
+    useSqlDatabase: false,
+    sqlBootstrap: "connection_url",
+    sqliteFilePath: "data/local.db",
+    databaseUrlEnvVar: "DATABASE_URL",
+    generateClaudeHandoff: true,
+    tryClaudeSpawn: false,
+    error: null,
+  });
+}
+
 export { STEP_ORDER };

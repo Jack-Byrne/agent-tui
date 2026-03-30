@@ -7,7 +7,7 @@ The wizard collects choices (LLM provider, memory, planning, prompts, knowledge,
 ## Requirements
 
 - **Node.js** 20+
-- A **real interactive terminal** (TTY). Ink needs raw mode; task runners and pipes without `/dev/tty` will not work for `create`.
+- A **real interactive terminal** (TTY). Ink needs raw mode; task runners and pipes without `/dev/tty` will not work for the menu or `create`.
 
 ## Install and build
 
@@ -22,38 +22,46 @@ Global use (optional):
 
 ```bash
 npm link
-agent-tui create -o ./out
+agent-tui
 ```
 
 Or run from the repo:
 
 ```bash
-node dist/cli.js create -o ./out
+node dist/cli.js
 ```
 
 ## Usage
 
 ```bash
-agent-tui create [--output|-o <dir>]
+agent-tui                      # default: interactive menu (same as menu)
+agent-tui menu [-o ./out]       # Create / Reload / Run; lists projects under -o
+agent-tui create [-o <dir>]     # wizard only; default parent dir is current directory
 agent-tui create-from <path/to/agent.scaffold.json> [-o <dir>]
 ```
 
-- **`-o, --output <dir>`** — Parent directory for the generated folder (default: current directory). The project is written to `<dir>/<project-name>/` where `project-name` comes from the wizard.
+### Main menu (`agent-tui` or `agent-tui menu`)
 
-**Regenerate with the same options:** every generated project includes **`agent.scaffold.json`** (what the wizard chose). Run **`create-from`** with that file to re-run the template pipeline without the TUI—useful after upgrading `agent-tui` or editing templates. If the manifest still lives at `<output>/<projectName>/agent.scaffold.json`, you can omit `-o` (the parent directory is inferred). Example: `agent-tui create-from ./out/my-agent/agent.scaffold.json`. **Note:** this overwrites generated files in that folder; keep secrets (`.env`) elsewhere or back them up first.
+- **Create** — multi-step wizard; new projects go to **`<output>/<project-name>/`** (menu default **`./out`**).
+- **Reload** — subfolders of **`-o`** that contain **`agent.scaffold.json`**: pick one to regenerate from its manifest (same as **`create-from`**).
+- **Run** — pick a project, optional user prompt; the TUI **temporarily unmounts** so **`npm run build`** and **`npm run start`** run in a normal terminal (full tsc + agent logs). When the agent finishes, the menu comes back with **another prompt**, **pick another project**, or **main menu**.
+
+**`-o` on `menu`:** parent for new projects and the directory **Reload** / **Run** scan (default **`./out`**). **`create`** still uses **`-o`** as the project parent (default **`.`**).
+
+**Regenerate without the TUI:** `agent-tui create-from ./out/my-agent/agent.scaffold.json`. Overwrites generated files; keep **`.env`** safe.
 
 ### In the wizard
 
 - **Arrow keys** and **Enter** — navigate lists and confirm.
 - **`b`** — go back one step.
-- **Esc** — exit.
+- **Esc** — exit from the main menu; from **Create**, return to the menu (wizard resets); from Reload/Run pickers, back to menu.
 
 ### If your environment is not a TTY
 
 Open an **integrated** or **system** terminal (not a headless runner), or on Linux try:
 
 ```bash
-script -q -c 'node dist/cli.js create -o ./out' /dev/null
+script -q -c 'node dist/cli.js' /dev/null
 ```
 
 When stdin/stdout are not TTYs, the CLI may attach to `/dev/tty` on Unix so it can still find a controlling terminal.

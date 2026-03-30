@@ -5,8 +5,9 @@ import React from "react";
 import fs from "node:fs";
 import tty from "node:tty";
 import { mkdir } from "node:fs/promises";
-import { resolve } from "pathe";
-import { App } from "./tui/App.js";
+import { basename, resolve } from "pathe";
+import { runGeneratedAgent } from "./run-generated-agent.js";
+import { MainApp, type RunResume, WizardApp } from "./tui/App.js";
 
 /**
  * When launched from a non-TTY parent (task runners, pipes), attach to the
@@ -28,6 +29,73 @@ function controllingTerminalStreams(): {
   }
 }
 
+function getInteractiveStreams(): {
+  stdin: NodeJS.ReadStream & { isTTY: boolean };
+  stdout: NodeJS.WriteStream & { isTTY: boolean };
+} | null {
+  const fromDevTty = controllingTerminalStreams();
+  const stdin =
+    process.stdin.isTTY
+      ? process.stdin
+      : (fromDevTty?.stdin as typeof process.stdin | undefined);
+  const stdout =
+    process.stdout.isTTY
+      ? process.stdout
+      : (fromDevTty?.stdout as typeof process.stdout | undefined);
+  if (!stdin?.isTTY || !stdout?.isTTY) return null;
+  return { stdin, stdout };
+}
+
+function mountMainMenu(
+  streams: {
+    stdin: NodeJS.ReadStream & { isTTY: boolean };
+    stdout: NodeJS.WriteStream & { isTTY: boolean };
+  },
+  projectsParentDir: string,
+  resume?: RunResume | null,
+): void {
+  const { stdin, stdout } = streams;
+  const ink = render(
+    React.createElement(MainApp, {
+      projectsParentDir,
+      initialResume: resume ?? null,
+      onWizardDone: ({ outputDir: out, claudeStdout, claudeNote }) => {
+        ink.unmount();
+        console.log("\nGenerated:", out);
+        if (claudeNote) console.log("\nClaude:", claudeNote);
+        if (claudeStdout) console.log(claudeStdout);
+        process.exit(0);
+      },
+      onExit: (code) => {
+        ink.unmount();
+        process.exit(code);
+      },
+      runGeneratedAgentInFolder: (projectRoot, userPrompt) => {
+        ink.unmount();
+        void (async () => {
+          const name = basename(projectRoot);
+          console.log(
+            `\n── ${name}: npm run build, then npm run start (full output below) ──\n`,
+          );
+          const code = await runGeneratedAgent(projectRoot, userPrompt);
+          const runError =
+            code === null ? "Could not run npm in that folder." : undefined;
+          console.log(
+            `\n── ${name} finished (exit ${code === null ? "?" : code}). ──\n`,
+          );
+          mountMainMenu(streams, projectsParentDir, {
+            type: "post_run",
+            projectRoot,
+            exitCode: code,
+            runError,
+          });
+        })();
+      },
+    }),
+    { stdin, stdout, stderr: process.stderr, patchConsole: true },
+  );
+}
+
 const program = new Command();
 
 program
@@ -36,21 +104,36 @@ program
   .version("0.1.0");
 
 program
+  .command("menu", { isDefault: true })
+  .description("Interactive menu: create, reload, run (default command)")
+  .option(
+    "-o, --output <dir>",
+    "Parent directory listing agent projects (Create writes here; Reload/Run scan it)",
+    "./out",
+  )
+  .action(async (opts: { output: string }) => {
+    const streams = getInteractiveStreams();
+    if (!streams) {
+      console.error(
+        "agent-tui needs an interactive terminal.\n" +
+          "  • Open the integrated terminal (Ctrl+`) and run: node dist/cli.js\n" +
+          "  • Or: script -q -c 'node dist/cli.js' /dev/null",
+      );
+      process.exit(1);
+    }
+
+    const projectsParentDir = resolve(process.cwd(), opts.output);
+    await mkdir(projectsParentDir, { recursive: true });
+    mountMainMenu(streams, projectsParentDir);
+  });
+
+program
   .command("create")
-  .description("Interactive wizard → generated project")
+  .description("Interactive wizard only (no main menu)")
   .option("-o, --output <dir>", "Output directory (parent of project folder)", ".")
   .action(async (opts: { output: string }) => {
-    const fromDevTty = controllingTerminalStreams();
-    const stdin =
-      process.stdin.isTTY
-        ? process.stdin
-        : (fromDevTty?.stdin as typeof process.stdin | undefined);
-    const stdout =
-      process.stdout.isTTY
-        ? process.stdout
-        : (fromDevTty?.stdout as typeof process.stdout | undefined);
-
-    if (!stdin?.isTTY || !stdout?.isTTY) {
+    const streams = getInteractiveStreams();
+    if (!streams) {
       console.error(
         "agent-tui create needs an interactive terminal.\n" +
           "  • Open the integrated terminal (Ctrl+`) and run: node dist/cli.js create -o ./out\n" +
@@ -61,8 +144,9 @@ program
 
     const outputDir = resolve(process.cwd(), opts.output);
     await mkdir(outputDir, { recursive: true });
+    const { stdin, stdout } = streams;
     const { waitUntilExit } = render(
-      React.createElement(App, {
+      React.createElement(WizardApp, {
         outputDir,
         onDone: ({ outputDir: out, claudeStdout, claudeNote }) => {
           console.log("\nGenerated:", out);
@@ -70,6 +154,7 @@ program
           if (claudeStdout) console.log(claudeStdout);
           process.exit(0);
         },
+        onCancel: () => process.exit(0),
       }),
       { stdin, stdout, stderr: process.stderr, patchConsole: true },
     );
